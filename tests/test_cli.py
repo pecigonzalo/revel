@@ -1,4 +1,5 @@
 # import typer
+import pytest
 from typer.testing import CliRunner
 
 from revel import cli
@@ -15,37 +16,22 @@ def test_shows_version():
     assert result.exit_code == 0, result.stderr
 
 
-def test_create_default():
+@pytest.mark.parametrize("command", ["create", "delete", "start", "stop"])
+def test_operate_with_instance_name(command):
+    instance_name = "revel1"
     result = runner.invoke(
         app=cli.app,
-        args=["create"],
+        args=[command, instance_name],
     )
 
-    assert result.exit_code == 0, result.stderr
+    assert result.exit_code == 0, result.output
 
 
-def test_delete_default():
+@pytest.mark.parametrize("command", ["create", "delete", "start", "stop"])
+def test_operate_with_default(command):
     result = runner.invoke(
         app=cli.app,
-        args=["delete"],
+        args=[command],
     )
 
-    assert result.exit_code == 0, result.stderr
-
-
-def test_start_default():
-    result = runner.invoke(
-        app=cli.app,
-        args=["start"],
-    )
-
-    assert result.exit_code == 0, result.stderr
-
-
-def test_stop_default():
-    result = runner.invoke(
-        app=cli.app,
-        args=["stop"],
-    )
-
-    assert result.exit_code == 0, result.stderr
+    assert result.exit_code == 0, result.output

@@ -8,22 +8,22 @@ app = typer.Typer()
 
 
 @app.command()
-def create():
+def create(name: Optional[str] = typer.Argument(None)):
     pass
 
 
 @app.command()
-def delete():
+def delete(name: Optional[str] = typer.Argument(None)):
     pass
 
 
 @app.command()
-def start():
+def start(name: Optional[str] = typer.Argument(None)):
     pass
 
 
 @app.command()
-def stop():
+def stop(name: Optional[str] = typer.Argument(None)):
     pass
 
 
