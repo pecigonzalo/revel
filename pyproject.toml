@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "revel"
 version = "0.1.0"
-description = "A Remove Development revel tool"
+description = "A Remote Development revel tool"
 authors = ["Gonzalo Peci <pecigonzalo@users.noreply.github.com>"]
 readme = 'README.md'
 
