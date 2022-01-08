@@ -13,7 +13,24 @@ def test_shows_version():
         args=["--version"],
     )
 
-    assert result.exit_code == 0, result.stderr
+    assert result.exit_code == 0, result.output
+
+
+def test_shows_help():
+    # Explicitly show help
+    result = runner.invoke(
+        app=cli.app,
+        args=["--help"],
+    )
+
+    assert result.exit_code == 0, result.output
+
+    # Show help if no command
+    result = runner.invoke(
+        app=cli.app,
+    )
+
+    assert result.exit_code == 0, result.output
 
 
 @pytest.mark.parametrize("command", ["create", "delete", "start", "stop"])
