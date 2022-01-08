@@ -2,7 +2,8 @@ from typing import Optional
 
 import typer
 
-from revel import __version__
+from revel import __name__ as cli_name
+from revel import __version__ as cli_version
 
 app = typer.Typer()
 
@@ -29,16 +30,15 @@ def stop(name: Optional[str] = typer.Argument(None)):
 
 def version_callback(value: bool):
     if value:
-        typer.echo(f"{__version__}")
+        typer.echo(cli_version)
         raise typer.Exit()
 
 
-@app.callback(no_args_is_help=True, context_settings={"auto_envvar_prefix": "REVEL"})
+@app.callback(no_args_is_help=True, context_settings={"auto_envvar_prefix": cli_name})
 def main(
     version: Optional[bool] = typer.Option(
         None, "--version", callback=version_callback, is_eager=True
     ),
 ):
     """ """
-
     pass
