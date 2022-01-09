@@ -1,0 +1,21 @@
+default:
+  name: "foo"
+  description: "Primary remote development machine"
+  ami: ami-123123
+  user: ec2-user
+  profile: "data-playground"
+  public: true
+  size: ""
+  disk:
+    size: 10
+    type: "io1"
+  backups: true
+  init:
+    - files:
+        - ~/some/init/path:/some/init/path
+    - run: "foo bar"
+  sync:
+    - ~/some/path:/some/path
+minimal:
+  ami: ami-123123
+  user: root
