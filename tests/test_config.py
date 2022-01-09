@@ -8,8 +8,9 @@ def test_full_config_load():
 
     assert isinstance(result, config.Config), "Config should be able to load"
 
-    if result.instances:
-        for k, v in result.instances.items():
-            assert isinstance(
-                v, config.Instance
-            ), f"Instances {k} should be of type Instance"
+    assert result.instances, "Configuration should have loaded mock instsancess"
+
+    for k, v in result.instances.items():
+        assert isinstance(
+            v, config.Instance
+        ), f"Instances {k} should be of type Instance"
