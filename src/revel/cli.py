@@ -28,6 +28,11 @@ def stop(name: Optional[str] = typer.Argument(None)):
     pass
 
 
+@app.command()
+def sync(name: Optional[str] = typer.Argument(None)):
+    pass
+
+
 def version_callback(value: bool):
     if value:
         typer.echo(cli_version)

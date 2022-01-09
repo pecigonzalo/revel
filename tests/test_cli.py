@@ -33,7 +33,7 @@ def test_shows_help():
     assert result.exit_code == 0, result.output
 
 
-@pytest.mark.parametrize("command", ["create", "delete", "start", "stop"])
+@pytest.mark.parametrize("command", ["create", "delete", "start", "stop", "sync"])
 def test_operate_with_instance_name(command):
     instance_name = "revel1"
     result = runner.invoke(
@@ -44,7 +44,7 @@ def test_operate_with_instance_name(command):
     assert result.exit_code == 0, result.output
 
 
-@pytest.mark.parametrize("command", ["create", "delete", "start", "stop"])
+@pytest.mark.parametrize("command", ["create", "delete", "start", "stop", "sync"])
 def test_operate_with_default(command):
     result = runner.invoke(
         app=cli.app,
