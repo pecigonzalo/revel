@@ -59,29 +59,42 @@ def create(name: str = typer.Argument(default="default")):
 
 
 @app.command()
-def destroy(name: str = typer.Argument(default="default")):
-    mm = MachineManager(
-        boto3.resource("ec2"),
-        STATE_DIR,
-        name,
-    )
-
-    machine = mm.get()
-
-    if machine:
-        typer.echo(f"Deleting instance {name}...")
-        typer.confirm("Do you want to continue?", abort=True)
-
-        with Halo(
-            text="Waiting for instance to be destroyed...",
-            spinner="bouncingBar",
-            color="green",
-        ):
-            mm.destroy()
-
-        typer.echo("Instance deleted 🎉")
+def destroy(
+    name: str = typer.Argument(default="default"),
+    all: bool = typer.Option(False, "--all"),
+):
+    if all:
+        typer.confirm(
+            "😱 About to destroy all machines, Do you want to continue?", abort=True
+        )
+        machines = MachineManager.list(STATE_DIR)
     else:
-        typer.echo("Instance does not exist 🤷")
+        typer.confirm(
+            f"💣 About to destroy {name}, do you want to continue?", abort=True
+        )
+        machines = ["name"]
+
+    for machine in machines:
+        mm = MachineManager(
+            boto3.resource("ec2"),
+            STATE_DIR,
+            machine,
+        )
+
+        machine = mm.get()
+
+        if machine:
+            typer.echo(f"Deleting instance {machine}...")
+            with Halo(
+                text="Waiting for instance to be destroyed...",
+                spinner="bouncingBar",
+                color="green",
+            ):
+                mm.destroy()
+
+            typer.echo(f"Instance {machine} deleted 🎉")
+        else:
+            typer.echo(f"Instance {machine} does not exist 🤷")
 
 
 @app.command()
