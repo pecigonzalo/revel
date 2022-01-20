@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, cast
 
 import yaml
+from botocore.exceptions import ClientError
 from mypy_boto3_ec2.literals import InstanceTypeType, ResourceTypeType
 from mypy_boto3_ec2.service_resource import EC2ServiceResource, Instance
 
@@ -171,7 +172,16 @@ class MachineManager:
             raise ValueError(f"Unable to find machine ID for {self.machine.name}")
 
         instance = self.ec2.Instance(self.machine.id)
-        instance.terminate()
+        try:
+            instance.terminate()
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code", None)
+            # InvalidInstanceID.Malformed is returned when instance cannot be found 🤷
+            if code in ["InvalidInstanceID.NotFound", "InvalidInstanceID.Malformed"]:
+                self.remove()
+            else:
+                raise e
+
         self.update(instance, state=MachineState.TERMINATING)
         instance.wait_until_terminated()
         self.remove()
