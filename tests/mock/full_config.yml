@@ -1,14 +1,14 @@
 default:
   name: "foo"
   description: "Primary remote development machine"
-  ami: ami-123123
+  ami: ami-05e155ca52886ffe4
   user: ec2-user
   profile: "data-playground"
   public: true
-  size: ""
+  size: "t3.micro"
   disk:
     size: 10
-    type: "io1"
+    type: "IO1"
   backups: true
   init:
     - files:
@@ -16,6 +16,21 @@ default:
     - run: "foo bar"
   sync:
     - ~/some/path:/some/path
-minimal:
-  ami: ami-123123
-  user: root
+revel1:
+  name: "foo"
+  description: "Primary remote development machine"
+  ami: ami-05e155ca52886ffe4
+  user: ec2-user
+  profile: "data-playground"
+  public: true
+  size: "t3.micro"
+  disk:
+    size: 10
+    type: "IO1"
+  backups: true
+  init:
+    - files:
+        - ~/some/init/path:/some/init/path
+    - run: "foo bar"
+  sync:
+    - ~/some/path:/some/path

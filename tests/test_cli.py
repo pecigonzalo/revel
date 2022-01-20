@@ -1,8 +1,11 @@
-# import typer
-import pytest
+# import pytest
+# from pytest_mock import MockerFixture
 from typer.testing import CliRunner
 
+# from revel import MachineManager,
 from revel import cli
+
+# from revel.machine import Machine
 
 runner = CliRunner()
 
@@ -33,22 +36,36 @@ def test_shows_help():
     assert result.exit_code == 0, result.output
 
 
-@pytest.mark.parametrize("command", ["create", "delete", "start", "stop", "sync"])
-def test_operate_with_instance_name(command):
-    instance_name = "revel1"
-    result = runner.invoke(
-        app=cli.app,
-        args=[command, instance_name],
-    )
+# @pytest.mark.parametrize("command", ["create", "destroy", "start", "stop", "sync"])
+# def test_operate_with_instance_name(mocker: MockerFixture, command):
+#     mocker.patch("typer.confirm").return_value = True
+#     instance_name = "revel1"
+#     # Commands that require confirmation
+#     if command in ["destroy"]:
+#         input = "\n"
+#     else:
+#         input = None
+#     result = runner.invoke(app=cli.app, args=[command, instance_name], input=input)
 
-    assert result.exit_code == 0, result.output
+#     assert result.exit_code == 0, result.output
 
 
-@pytest.mark.parametrize("command", ["create", "delete", "start", "stop", "sync"])
-def test_operate_with_default(command):
-    result = runner.invoke(
-        app=cli.app,
-        args=[command],
-    )
+# @pytest.mark.parametrize("command", ["create", "destroy", "start", "stop", "sync"])
+# def test_operate_with_default(mocker: MockerFixture, command):
+#     mocker.patch("typer.confirm").return_value = True
 
-    assert result.exit_code == 0, result.output
+#     mm = mocker.create_autospec(MachineManager)
+#     mocker.patch("revel.machine.MachineManager", mm)
+#     mm.get.return_value = Machine()
+
+#     # Commands that require confirmation
+#     if command in ["destroy"]:
+#         input = "\n"
+#     else:
+#         input = None
+#     result = runner.invoke(app=cli.app, args=[command], input=input)
+
+#     if command in ["destroy"]:
+#         assert mm.get.called
+
+#     assert result.exit_code == 0, result.output
