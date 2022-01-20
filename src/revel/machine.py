@@ -76,6 +76,12 @@ class MachineManager:
 
         return Path(f"{self.machine_state_dir}/{self.machine.name}.yml")
 
+    @staticmethod
+    def list(path: Path):
+        return [
+            file.with_suffix("").name for file in path.glob("*.yml") if file.is_file()
+        ]
+
     def save(self) -> None:
         instance_state = self._get_machine_state_path()
         with instance_state.open("w") as state_file:

@@ -2,6 +2,7 @@ from typing import Optional
 
 import boto3
 import typer
+import yaml
 from halo import Halo
 
 from revel import CONFIG, STATE_DIR
@@ -81,6 +82,12 @@ def destroy(name: str = typer.Argument(default="default")):
         typer.echo("Instance deleted 🎉")
     else:
         typer.echo("Instance does not exist 🤷")
+
+
+@app.command()
+def list():
+    machines = MachineManager.list(STATE_DIR)
+    typer.echo(yaml.safe_dump(machines))
 
 
 @app.command()
