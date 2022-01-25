@@ -12,8 +12,9 @@ default:
   backups: true
   init:
     - files:
-        - ~/some/init/path:/some/init/path
-    - run: "foo bar"
+        - ~/.yarnrc:/tmp/.yarnrc
+    - run: "ls -lah"
+    - run: "ls -lah /tmp"
   sync:
     - ~/some/path:/some/path
 revel1:

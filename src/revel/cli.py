@@ -1,18 +1,80 @@
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import boto3
 import typer
 import yaml
 from halo import Halo
+from sh import ErrorReturnCode  # TODO: This is a bit leaky
 
 from revel import Config
 from revel import __name__ as cli_name
 from revel import __version__ as cli_version
+from revel.clients import SSH
+from revel.config import InitFiles, InitRun
 from revel.machine import MachineManager
 from revel.state import state
 
 app = typer.Typer()
+
+
+@app.command()
+def provision(
+    ctx: typer.Context,
+    name: str = typer.Argument(default="default"),
+    # NOTE: Using List instead of list because mypy is complaining
+    extra: Optional[List[str]] = typer.Option(None),
+):
+    CONFIG = Config(ctx.obj["config"])
+    STATE_DIR = ctx.obj["state"]
+    DEBUG = ctx.obj["debug"]
+
+    mm = MachineManager(
+        boto3.resource("ec2"),
+        STATE_DIR,
+        name,
+    )
+    machine = mm.get()
+    if not machine:
+        typer.echo(f"Instance {name} does not exist")
+        raise typer.Exit()
+
+    if not machine.public_ip_address:
+        typer.echo(f"Instance {name} has no public IP")
+        raise typer.Exit()
+
+    instance_config = CONFIG.instances.get(name)
+    if not instance_config:
+        typer.echo("Failed to find instance config")
+        raise typer.Exit()
+
+    client = SSH(user=machine.user, host=machine.public_ip_address)
+    for init in instance_config.init:
+        if type(init) is InitFiles:
+            for src, dst in init:
+                typer.echo(f"Uploading file {src} to {dst}")
+                command = client.sync(src=src, dst=dst)
+                if DEBUG:
+                    typer.echo(command)
+                try:
+                    command()
+                except ErrorReturnCode:
+                    raise typer.Abort()
+
+        elif type(init) is InitRun:
+            typer.echo(f"Executing {init}")
+            command = client.run(
+                opts=extra,
+                args=[init],
+            )
+            if DEBUG:
+                typer.echo(command)
+            try:
+                command()
+            except ErrorReturnCode:
+                raise typer.Abort()
+        else:
+            typer.echo(f"Unkown type {type(init)} for {init}")
 
 
 @app.command()
@@ -164,7 +226,9 @@ def main(
     version: Optional[bool] = typer.Option(
         None, "--version", callback=version_callback, is_eager=True
     ),
+    debug: bool = typer.Option(state["debug"]),
     config: Path = typer.Option(state["config"]),
 ):
     ctx.obj = state
     ctx.obj["config"] = config
+    ctx.obj["debug"] = debug

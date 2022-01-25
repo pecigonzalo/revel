@@ -1,3 +1,4 @@
+from collections import UserList
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -17,10 +18,18 @@ class Disk:
     size: int
 
 
-InitFile = list[str]
+InitFile = tuple[str, str]
+
+
+class InitFilesClass(UserList[InitFile]):
+    pass
+
+
+InitFiles = InitFilesClass
+
 InitRun = str
 
-Init = Union[InitFile, InitRun]
+Init = Union[InitFiles, InitRun]
 
 
 @dataclass
@@ -35,11 +44,26 @@ class Instance:
     disk: Optional[Disk] = None
     backups: bool = False
     auto_shutdown: bool = True
-    init: list[Init] = field(default_factory=list)
-    sync: list[str] = field(default_factory=list)
+    init: list[Init] = field(default_factory=list[Init])
+    sync: list[str] = field(default_factory=list[str])
 
     @staticmethod
     def parse(**kwargs) -> "Instance":
+        init: list[Init] = []
+        for i in kwargs.get("init", []):
+            if i.get("files", None):
+                # Create touple of files to sync
+                files: InitFiles = InitFilesClass(
+                    [
+                        (file.split(":")[0], file.split(":")[1])
+                        for file in i.get("files")
+                    ]
+                )
+                init.append(files)
+            elif i.get("run", None):
+                run = i.get("run")
+                init.append(run)
+
         return Instance(
             ami=kwargs.get("ami", None),
             user=kwargs.get("user", None),
@@ -51,7 +75,7 @@ class Instance:
             disk=kwargs.get("disk", None),
             backups=kwargs.get("backups", None),
             auto_shutdown=kwargs.get("auto_shutdown", None),
-            init=[i for i in kwargs.get("init", [])],
+            init=init,
             sync=[i for i in kwargs.get("sync", [])],
         )
 
@@ -60,13 +84,12 @@ Instances = dict[str, Instance]
 
 
 class Config:
-    instances: Optional[Instances] = None
+    instances: Instances
 
     def load(self, path: Path) -> None:
         with open(path, "r") as config:
             yaml_config = yaml.safe_load(config)
             self.instances = {k: Instance.parse(**v) for k, v in yaml_config.items()}
 
-    def __init__(self, path: Optional[Path] = None) -> None:
-        if path:
-            self.load(path)
+    def __init__(self, path: Path):
+        self.load(path)
