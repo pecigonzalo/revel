@@ -20,5 +20,11 @@ def mock_aws_credentials(monkeypatch):
 def mock_state_conf(monkeypatch, tmp_path):
     # Application of the monkeypatch to replace Path.home
     # with the behavior of mockreturn defined above.
-    monkeypatch.setattr(revel, "STATE_DIR", Path("tests/mock/full_config.yml"))
-    monkeypatch.setattr(revel, "CONFIG", tmp_path)
+    monkeypatch.setattr(
+        revel,
+        "state",
+        {
+            "config": Path("tests/mock/full_config.yml"),
+            "state": tmp_path,
+        },
+    )

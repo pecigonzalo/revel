@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Optional
 
 import boto3
@@ -5,16 +6,22 @@ import typer
 import yaml
 from halo import Halo
 
-from revel import CONFIG, STATE_DIR
+from revel import Config
 from revel import __name__ as cli_name
 from revel import __version__ as cli_version
 from revel.machine import MachineManager
+from revel.state import state
 
 app = typer.Typer()
 
 
 @app.command()
-def create(name: str = typer.Argument(default="default")):
+def create(
+    ctx: typer.Context,
+    name: str = typer.Argument(default="default"),
+):
+    CONFIG = Config(ctx.obj["config"])
+    STATE_DIR = ctx.obj["state"]
     instances = CONFIG.instances
     if not instances:
         typer.echo("Unable to find instances in the configuration")
@@ -60,9 +67,11 @@ def create(name: str = typer.Argument(default="default")):
 
 @app.command()
 def destroy(
+    ctx: typer.Context,
     name: str = typer.Argument(default="default"),
     all: bool = typer.Option(False, "--all"),
 ):
+    STATE_DIR = ctx.obj["state"]
     if all:
         typer.confirm(
             "😱 About to destroy all machines, Do you want to continue?", abort=True
@@ -72,7 +81,7 @@ def destroy(
         typer.confirm(
             f"💣 About to destroy {name}, do you want to continue?", abort=True
         )
-        machines = ["name"]
+        machines = [name]
 
     for machine in machines:
         mm = MachineManager(
@@ -98,9 +107,34 @@ def destroy(
 
 
 @app.command()
-def list():
+def list(
+    ctx: typer.Context,
+):
+    STATE_DIR = ctx.obj["state"]
     machines = MachineManager.list(STATE_DIR)
     typer.echo(yaml.safe_dump(machines))
+
+
+@app.command()
+def refresh(
+    ctx: typer.Context,
+    name: str = typer.Argument(default="default"),
+    all: bool = typer.Option(False, "--all"),
+):
+    STATE_DIR = ctx.obj["state"]
+    if all:
+        machines = MachineManager.list(STATE_DIR)
+    else:
+        machines = [name]
+
+    with typer.progressbar(machines, label="Refreshing") as progress:
+        for machine in progress:
+            mm = MachineManager(
+                boto3.resource("ec2"),
+                STATE_DIR,
+                machine,
+            )
+            mm.refresh()
 
 
 @app.command()
@@ -126,9 +160,11 @@ def version_callback(value: bool):
 
 @app.callback(no_args_is_help=True, context_settings={"auto_envvar_prefix": cli_name})
 def main(
+    ctx: typer.Context,
     version: Optional[bool] = typer.Option(
         None, "--version", callback=version_callback, is_eager=True
     ),
+    config: Path = typer.Option(state["config"]),
 ):
-    """ """
-    pass
+    ctx.obj = state
+    ctx.obj["config"] = config

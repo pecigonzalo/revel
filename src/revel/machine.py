@@ -106,6 +106,17 @@ class MachineManager:
         if persist:
             self.save()
 
+    def refresh(self) -> Machine:
+        self.load()
+        if self.machine.id:
+            id = self.machine.id
+        else:
+            raise ValueError("Machine ID not found")
+
+        instance = self.ec2.Instance(id)
+        self.update(instance=instance)
+        return self.machine
+
     def load(self) -> Optional[Machine]:
         instance_state = self._get_machine_state_path()
         if not instance_state.exists():
@@ -146,7 +157,7 @@ class MachineManager:
             self.machine.user = user
 
         # Create a single instance
-        self.update()
+        self.save()
         instances = self.ec2.create_instances(
             MaxCount=1,
             MinCount=1,
