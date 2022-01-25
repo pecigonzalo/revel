@@ -30,7 +30,6 @@ def provision(
     DEBUG = ctx.obj["debug"]
 
     mm = MachineManager(
-        boto3.resource("ec2"),
         STATE_DIR,
         name,
     )
@@ -147,7 +146,6 @@ def destroy(
 
     for machine in machines:
         mm = MachineManager(
-            boto3.resource("ec2"),
             STATE_DIR,
             machine,
         )
@@ -192,11 +190,38 @@ def refresh(
     with typer.progressbar(machines, label="Refreshing") as progress:
         for machine in progress:
             mm = MachineManager(
-                boto3.resource("ec2"),
                 STATE_DIR,
                 machine,
             )
             mm.refresh()
+
+
+@app.command()
+def ssh(
+    ctx: typer.Context,
+    name: str = typer.Argument(default="default"),
+    print: bool = typer.Option(False),
+):
+    STATE_DIR = ctx.obj["state"]
+    mm = MachineManager(
+        STATE_DIR,
+        name,
+    )
+    machine = mm.get()
+    if not machine:
+        typer.echo(f"Instance {name} does not exist")
+        raise typer.Exit()
+
+    if not machine.public_ip_address:
+        typer.echo(f"Instance {name} has no public IP")
+        raise typer.Exit()
+
+    client = SSH(machine.user, machine.public_ip_address)
+    command = client.run(args=[])
+    if print:
+        typer.echo(command)
+    else:
+        command()
 
 
 @app.command()

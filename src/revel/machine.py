@@ -3,6 +3,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, cast
 
+import boto3
 import yaml
 from botocore.exceptions import ClientError
 from mypy_boto3_ec2.literals import InstanceTypeType, ResourceTypeType
@@ -54,12 +55,15 @@ class Machine:
 
 
 class MachineManager:
-    ec2: EC2ServiceResource
     machine_state_dir: Path
     machine: Machine
+    ec2: EC2ServiceResource
 
     def __init__(
-        self, ec2: EC2ServiceResource, machine_state_dir: Path, name: str
+        self,
+        machine_state_dir: Path,
+        name: str,
+        ec2: EC2ServiceResource = boto3.resource("ec2"),
     ) -> None:
         self.ec2 = ec2
         self.machine_state_dir = machine_state_dir
@@ -134,6 +138,7 @@ class MachineManager:
         instance_state = self._get_machine_state_path()
         instance_state.unlink()
 
+    # TODO: Get or raise, None is problematic here
     def get(self) -> Optional[Machine]:
         try:
             if self.load():
