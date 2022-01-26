@@ -10,9 +10,9 @@ from sh import ErrorReturnCode  # TODO: This is a bit leaky
 from revel import Config
 from revel import __name__ as cli_name
 from revel import __version__ as cli_version
-from revel.clients import SSH
-from revel.config import InitFiles, InitRun
+from revel.config import RunCommand, SyncFiles
 from revel.machine import MachineManager
+from revel.providers.ssh import SSH
 from revel.state import state
 
 app = typer.Typer()
@@ -49,7 +49,7 @@ def provision(
 
     client = SSH(user=machine.user, host=machine.public_ip_address)
     for init in instance_config.init:
-        if type(init) is InitFiles:
+        if type(init) is SyncFiles:
             for src, dst in init:
                 typer.echo(f"Uploading file {src} to {dst}")
                 command = client.sync(src=src, dst=dst)
@@ -60,7 +60,7 @@ def provision(
                 except ErrorReturnCode:
                     raise typer.Abort()
 
-        elif type(init) is InitRun:
+        elif type(init) is RunCommand:
             typer.echo(f"Executing {init}")
             command = client.run(
                 opts=extra,
@@ -235,8 +235,41 @@ def stop(name: str = typer.Argument(default="default")):
 
 
 @app.command()
-def sync(name: str = typer.Argument(default="default")):
-    pass
+def sync(
+    ctx: typer.Context,
+    name: str = typer.Argument(default="default"),
+):
+    CONFIG = Config(ctx.obj["config"])
+    STATE_DIR = ctx.obj["state"]
+    DEBUG = ctx.obj["debug"]
+    mm = MachineManager(
+        STATE_DIR,
+        name,
+    )
+    machine = mm.get()
+    if not machine:
+        typer.echo(f"Instance {name} does not exist")
+        raise typer.Exit()
+
+    if not machine.public_ip_address:
+        typer.echo(f"Instance {name} has no public IP")
+        raise typer.Exit()
+
+    instance_config = CONFIG.instances.get(name)
+    if not instance_config:
+        typer.echo("Failed to find instance config")
+        raise typer.Exit()
+
+    client = SSH(machine.user, machine.public_ip_address)
+    for src, dst in instance_config.sync:
+        typer.echo(f"Uploading file {src} to {dst}")
+        command = client.sync(src=src, dst=dst)
+        if DEBUG:
+            typer.echo(command)
+        try:
+            command()
+        except ErrorReturnCode:
+            raise typer.Abort()
 
 
 def version_callback(value: bool):

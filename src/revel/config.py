@@ -18,18 +18,16 @@ class Disk:
     size: int
 
 
-InitFile = tuple[str, str]
+SyncFile = tuple[str, str]
 
 
-class InitFilesClass(UserList[InitFile]):
+class SyncFiles(UserList[SyncFile]):
     pass
 
 
-InitFiles = InitFilesClass
+RunCommand = str
 
-InitRun = str
-
-Init = Union[InitFiles, InitRun]
+Init = Union[SyncFiles, RunCommand]
 
 
 @dataclass
@@ -45,7 +43,7 @@ class Instance:
     backups: bool = False
     auto_shutdown: bool = True
     init: list[Init] = field(default_factory=list[Init])
-    sync: list[str] = field(default_factory=list[str])
+    sync: list[SyncFile] = field(default_factory=list[SyncFile])
 
     @staticmethod
     def parse(**kwargs) -> "Instance":
@@ -53,16 +51,22 @@ class Instance:
         for i in kwargs.get("init", []):
             if i.get("files", None):
                 # Create touple of files to sync
-                files: InitFiles = InitFilesClass(
+                init_files = SyncFiles(
                     [
                         (file.split(":")[0], file.split(":")[1])
                         for file in i.get("files")
                     ]
                 )
-                init.append(files)
+                init.append(init_files)
             elif i.get("run", None):
                 run = i.get("run")
                 init.append(run)
+
+        sync: list[SyncFile] = []
+        for file in kwargs.get("sync", []):
+            # Create touple of files to sync
+            sync_files = (file.split(":")[0], file.split(":")[1])
+            sync.append(sync_files)
 
         return Instance(
             ami=kwargs.get("ami", None),
@@ -76,7 +80,7 @@ class Instance:
             backups=kwargs.get("backups", None),
             auto_shutdown=kwargs.get("auto_shutdown", None),
             init=init,
-            sync=[i for i in kwargs.get("sync", [])],
+            sync=sync,
         )
 
 

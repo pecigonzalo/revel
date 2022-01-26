@@ -2,7 +2,7 @@ default:
   name: "foo"
   description: "Primary remote development machine"
   ami: ami-05e155ca52886ffe4
-  user: ec2-user
+  user: ubuntu
   profile: "data-playground"
   public: true
   size: "t3.micro"
@@ -16,12 +16,12 @@ default:
     - run: "ls -lah"
     - run: "ls -lah /tmp"
   sync:
-    - ~/some/path:/some/path
+    - ~/.yarnrc:/tmp/.yarnrc
 revel1:
   name: "foo"
   description: "Primary remote development machine"
   ami: ami-05e155ca52886ffe4
-  user: ec2-user
+  user: ubuntu
   profile: "data-playground"
   public: true
   size: "t3.micro"
@@ -31,7 +31,7 @@ revel1:
   backups: true
   init:
     - files:
-        - ~/some/init/path:/some/init/path
-    - run: "foo bar"
+        - ~/.yarnrc:/tmp/.yarnrc
+    - run: "echo foo bar"
   sync:
-    - ~/some/path:/some/path
+    - ~/.yarnrc:/tmp/.yarnrc
