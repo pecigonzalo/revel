@@ -186,8 +186,7 @@ class MachineManager:
         self.update(instance, state=MachineState.CREATING)
 
         instance.wait_until_running()
-        self.update(instance, state=MachineState.RUNNING)
-        return self.machine
+        return self.refresh()
 
     def destroy(self) -> None:
         if not self.machine.id:
@@ -209,10 +208,26 @@ class MachineManager:
         self.remove()
 
     def stop(self) -> None:
-        raise NotImplementedError("Not implemented")
+        if not self.machine.id:
+            raise ValueError(f"Unable to find machine ID for {self.machine.name}")
+
+        instance = self.ec2.Instance(self.machine.id)
+
+        instance.stop()
+        instance.wait_until_stopped()
+        self.refresh()
+        self.update(state=MachineState.STOPPED)
 
     def start(self) -> None:
-        raise NotImplementedError("Not implemented")
+        if not self.machine.id:
+            raise ValueError(f"Unable to find machine ID for {self.machine.name}")
+
+        instance = self.ec2.Instance(self.machine.id)
+
+        instance.start()
+        instance.wait_until_running()
+        self.refresh()
+        self.update(state=MachineState.RUNNING)
 
     def suspend(self) -> None:
         raise NotImplementedError("Not implemented")

@@ -225,13 +225,45 @@ def ssh(
 
 
 @app.command()
-def start(name: str = typer.Argument(default="default")):
-    pass
+def start(
+    ctx: typer.Context,
+    name: str = typer.Argument(default="default"),
+    all: bool = typer.Option(False, "--all"),
+):
+    STATE_DIR = ctx.obj["state"]
+    if all:
+        machines = MachineManager.list(STATE_DIR)
+    else:
+        machines = [name]
+
+    with typer.progressbar(machines, label="Starting") as progress:
+        for machine in progress:
+            mm = MachineManager(
+                STATE_DIR,
+                machine,
+            )
+            mm.start()
 
 
 @app.command()
-def stop(name: str = typer.Argument(default="default")):
-    pass
+def stop(
+    ctx: typer.Context,
+    name: str = typer.Argument(default="default"),
+    all: bool = typer.Option(False, "--all"),
+):
+    STATE_DIR = ctx.obj["state"]
+    if all:
+        machines = MachineManager.list(STATE_DIR)
+    else:
+        machines = [name]
+
+    with typer.progressbar(machines, label="Stopping") as progress:
+        for machine in progress:
+            mm = MachineManager(
+                STATE_DIR,
+                machine,
+            )
+            mm.stop()
 
 
 @app.command()
