@@ -1,4 +1,5 @@
 from pathlib import Path
+from textwrap import dedent
 from typing import List, Optional
 
 import boto3
@@ -302,6 +303,48 @@ def sync(
             command()
         except ErrorReturnCode:
             raise typer.Abort()
+
+
+@app.command()
+def ssh_config(
+    ctx: typer.Context,
+    file: typer.FileTextWrite = typer.Option(
+        f"{Path.home()}/.ssh/revel.config",
+        show_default=False,
+        show_envvar=False,
+        help="[default: ~/.ssh/revel.config]",
+    ),
+    name: str = typer.Argument(default="default"),
+    print: bool = typer.Option(False),
+):
+    STATE_DIR = ctx.obj["state"]
+    mm = MachineManager(
+        STATE_DIR,
+        name,
+    )
+    machine = mm.get()
+    if not machine:
+        typer.echo(f"Instance {name} does not exist")
+        raise typer.Exit()
+
+    if not machine.public_ip_address:
+        typer.echo(f"Instance {name} has no public IP")
+        raise typer.Exit()
+
+    # host = f"{machine.user}@{machine.host}"
+
+    config = dedent(
+        f"""\
+    Host {name}.revel
+        User {machine.user}
+        Hostname {machine.public_ip_address}
+    """
+    )
+
+    if print:
+        typer.echo(config)
+    else:
+        file.write(config)
 
 
 def version_callback(value: bool):
