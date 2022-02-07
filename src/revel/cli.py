@@ -3,7 +3,9 @@ from pathlib import Path
 from textwrap import dedent
 from typing import List, Optional
 
+import boto3
 import typer
+from botocore.exceptions import BotoCoreError
 from halo import Halo
 from sh import ErrorReturnCode  # TODO: This is a bit too leaky
 from tabulate import tabulate
@@ -19,6 +21,20 @@ from revel.state import state
 app = typer.Typer()
 
 
+def get_ec2_resource():
+    # TODO: Replace with better an abstraction. This is an aweful hack to get this going.
+    # We might want to replace/abstract MachineManager
+    # and instantiate it only once here.
+    try:
+        return boto3.Session().resource("ec2")
+    except BotoCoreError as e:
+        typer.secho(
+            f"An error occurred while setting up the AWS session: {e}",
+            fg=typer.colors.RED,
+        )
+        raise e
+
+
 @app.command()
 def provision(
     ctx: typer.Context,
@@ -29,10 +45,12 @@ def provision(
     CONFIG = Config(ctx.obj["config"])
     STATE_DIR = ctx.obj["state"]
     DEBUG = ctx.obj["debug"]
+    SESSION = get_ec2_resource()
 
     machine = MachineManager(
         STATE_DIR,
         name,
+        SESSION,
     ).machine
     if not machine:
         typer.echo(f"Instance {name} does not exist")
@@ -83,6 +101,7 @@ def create(
 ):
     CONFIG = Config(ctx.obj["config"])
     STATE_DIR = ctx.obj["state"]
+    SESSION = get_ec2_resource()
     instances = CONFIG.instances
     if not instances:
         typer.echo("Unable to find instances in the configuration")
@@ -96,6 +115,7 @@ def create(
     mm = MachineManager(
         STATE_DIR,
         name,
+        SESSION,
     )
     machine = mm.machine
 
@@ -129,11 +149,12 @@ def destroy(
     all: bool = typer.Option(False, "--all"),
 ):
     STATE_DIR = ctx.obj["state"]
+    SESSION = get_ec2_resource()
     if all:
         typer.confirm(
             "😱 About to destroy all machines, Do you want to continue?", abort=True
         )
-        managers = MachineManager.list(STATE_DIR)
+        managers = MachineManager.list(STATE_DIR, SESSION)
     else:
         typer.confirm(
             f"💣 About to destroy {name}, do you want to continue?", abort=True
@@ -142,6 +163,7 @@ def destroy(
             MachineManager(
                 STATE_DIR,
                 name,
+                SESSION,
             )
         ]
 
@@ -175,7 +197,8 @@ def list_machines(
     ),
 ):
     STATE_DIR = ctx.obj["state"]
-    machines = [mm.machine for mm in MachineManager.list(STATE_DIR)]
+    SESSION = get_ec2_resource()
+    machines = [mm.machine for mm in MachineManager.list(STATE_DIR, SESSION)]
 
     aliases = [
         field.split(":")[1] if field.split(":")[1:] else field.split(":")[0]
@@ -204,13 +227,15 @@ def refresh(
     all: bool = typer.Option(False, "--all"),
 ):
     STATE_DIR = ctx.obj["state"]
+    SESSION = get_ec2_resource()
     if all:
-        managers = MachineManager.list(STATE_DIR)
+        managers = MachineManager.list(STATE_DIR, SESSION)
     else:
         managers = [
             MachineManager(
                 STATE_DIR,
                 name,
+                SESSION,
             )
         ]
 
@@ -226,9 +251,11 @@ def ssh(
     print: bool = typer.Option(False),
 ):
     STATE_DIR = ctx.obj["state"]
+    SESSION = get_ec2_resource()
     machine = MachineManager(
         STATE_DIR,
         name,
+        SESSION,
     ).machine
     if not machine:
         typer.echo(f"Instance {name} does not exist")
@@ -253,10 +280,11 @@ def start(
     all: bool = typer.Option(False, "--all"),
 ):
     STATE_DIR = ctx.obj["state"]
+    SESSION = get_ec2_resource()
     if all:
-        managers = MachineManager.list(STATE_DIR)
+        managers = MachineManager.list(STATE_DIR, SESSION)
     else:
-        managers = [MachineManager(STATE_DIR, name)]
+        managers = [MachineManager(STATE_DIR, name, SESSION)]
 
     with typer.progressbar(managers, label="Starting") as progress:
         for manager in progress:
@@ -270,10 +298,11 @@ def stop(
     all: bool = typer.Option(False, "--all"),
 ):
     STATE_DIR = ctx.obj["state"]
+    SESSION = get_ec2_resource()
     if all:
-        managers = MachineManager.list(STATE_DIR)
+        managers = MachineManager.list(STATE_DIR, SESSION)
     else:
-        managers = [MachineManager(STATE_DIR, name)]
+        managers = [MachineManager(STATE_DIR, name, SESSION)]
 
     with typer.progressbar(managers, label="Stopping") as progress:
         for manager in progress:
@@ -288,9 +317,11 @@ def sync(
     CONFIG = Config(ctx.obj["config"])
     STATE_DIR = ctx.obj["state"]
     DEBUG = ctx.obj["debug"]
+    SESSION = get_ec2_resource()
     machine = MachineManager(
         STATE_DIR,
         name,
+        SESSION,
     ).machine
     if not machine:
         typer.echo(f"Instance {name} does not exist")
@@ -330,10 +361,8 @@ def ssh_config(
     print: bool = typer.Option(False),
 ):
     STATE_DIR = ctx.obj["state"]
-    machine = MachineManager(
-        STATE_DIR,
-        name,
-    ).machine
+    SESSION = get_ec2_resource()
+    machine = MachineManager(STATE_DIR, name, SESSION).machine
     if not machine:
         typer.echo(f"Instance {name} does not exist")
         raise typer.Exit()

@@ -3,7 +3,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, cast
 
-import boto3
 import yaml
 from botocore.exceptions import ClientError
 from mypy_boto3_ec2.literals import InstanceTypeType, VolumeTypeType
@@ -84,7 +83,7 @@ class MachineManager:
         self,
         machine_state_dir: Path,
         name: str,
-        ec2: EC2ServiceResource = boto3.resource("ec2"),
+        ec2: EC2ServiceResource,
     ) -> None:
         self.ec2 = ec2
         self.machine_state_dir = machine_state_dir
@@ -102,9 +101,12 @@ class MachineManager:
         return Path(f"{self.machine_state_dir}/{self.machine.name}.yml")
 
     @staticmethod
-    def list(machine_state_dir: Path) -> list["MachineManager"]:
+    def list(
+        machine_state_dir: Path,
+        ec2: EC2ServiceResource,
+    ) -> list["MachineManager"]:
         return [
-            MachineManager(machine_state_dir, file.with_suffix("").name)
+            MachineManager(machine_state_dir, file.with_suffix("").name, ec2)
             for file in machine_state_dir.glob("*.yml")
             if file.is_file()
         ]
