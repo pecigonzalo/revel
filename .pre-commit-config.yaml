@@ -26,3 +26,4 @@ repos:
           - "types-setuptools"
           - "types-PyYAML"
           - "types-boto3"
+          - "types-tabulate"

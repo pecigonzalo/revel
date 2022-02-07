@@ -1,12 +1,12 @@
+from enum import Enum
 from pathlib import Path
 from textwrap import dedent
 from typing import List, Optional
 
-import boto3
 import typer
-import yaml
 from halo import Halo
-from sh import ErrorReturnCode  # TODO: This is a bit leaky
+from sh import ErrorReturnCode  # TODO: This is a bit too leaky
+from tabulate import tabulate
 
 from revel import Config
 from revel import __name__ as cli_name
@@ -30,11 +30,10 @@ def provision(
     STATE_DIR = ctx.obj["state"]
     DEBUG = ctx.obj["debug"]
 
-    mm = MachineManager(
+    machine = MachineManager(
         STATE_DIR,
         name,
-    )
-    machine = mm.get()
+    ).machine
     if not machine:
         typer.echo(f"Instance {name} does not exist")
         raise typer.Exit()
@@ -95,14 +94,12 @@ def create(
         raise typer.Abort()
 
     mm = MachineManager(
-        ec2=boto3.resource("ec2"),
-        machine_state_dir=STATE_DIR,
-        name=name,
+        STATE_DIR,
+        name,
     )
+    machine = mm.machine
 
-    machine = mm.get()
-
-    if machine:
+    if machine.id:
         typer.echo(f'Instance "{name}" already exists')
         typer.echo(f"Instance id: {machine.id}")
         typer.echo("Connection information:")
@@ -124,8 +121,6 @@ def create(
         typer.echo("Connection information:")
         typer.echo(f"Public IP: {machine.public_ip_address}")
 
-    # TODO: Implement connection information
-
 
 @app.command()
 def destroy(
@@ -138,42 +133,68 @@ def destroy(
         typer.confirm(
             "😱 About to destroy all machines, Do you want to continue?", abort=True
         )
-        machines = MachineManager.list(STATE_DIR)
+        managers = MachineManager.list(STATE_DIR)
     else:
         typer.confirm(
             f"💣 About to destroy {name}, do you want to continue?", abort=True
         )
-        machines = [name]
+        managers = [
+            MachineManager(
+                STATE_DIR,
+                name,
+            )
+        ]
 
-    for machine in machines:
-        mm = MachineManager(
-            STATE_DIR,
-            machine,
-        )
+    for mm in managers:
+        typer.echo(f"Deleting instance {mm.machine.name}...")
+        with Halo(
+            text="Waiting for instance to be destroyed...",
+            spinner="bouncingBar",
+            color="green",
+        ):
+            mm.destroy()
 
-        machine = mm.get()
-
-        if machine:
-            typer.echo(f"Deleting instance {machine}...")
-            with Halo(
-                text="Waiting for instance to be destroyed...",
-                spinner="bouncingBar",
-                color="green",
-            ):
-                mm.destroy()
-
-            typer.echo(f"Instance {machine} deleted 🎉")
-        else:
-            typer.echo(f"Instance {machine} does not exist 🤷")
+        typer.echo(f"Instance {mm.machine.name} deleted 🎉")
+        # else:
+        #     typer.echo(f"Instance {mm.machine.name} does not exist 🤷")
 
 
-@app.command()
-def list(
+class ListFormat(str, Enum):
+    plain = "plain"
+    simple = "simple"
+    github = "github"
+
+
+# We have to alias the function to avoid collition with typing
+@app.command(name="list")
+def list_machines(
     ctx: typer.Context,
+    format: ListFormat = ListFormat.simple,
+    fields: list[str] = typer.Option(
+        ["name", "private_ip_address:ip", "state"], "--field"
+    ),
 ):
     STATE_DIR = ctx.obj["state"]
-    machines = MachineManager.list(STATE_DIR)
-    typer.echo(yaml.safe_dump(machines))
+    machines = [mm.machine for mm in MachineManager.list(STATE_DIR)]
+
+    aliases = [
+        field.split(":")[1] if field.split(":")[1:] else field.split(":")[0]
+        for field in fields
+    ]
+    fields = [field.split(":")[0] for field in fields]
+
+    headers = [alias.title().replace("_", " ") for alias in aliases]
+    body = [
+        [getattr(machine, field.lower()) for field in fields] for machine in machines
+    ]
+
+    table = tabulate(
+        body,
+        headers=headers,
+        tablefmt=format,
+    )
+
+    typer.echo(table)
 
 
 @app.command()
@@ -184,17 +205,18 @@ def refresh(
 ):
     STATE_DIR = ctx.obj["state"]
     if all:
-        machines = MachineManager.list(STATE_DIR)
+        managers = MachineManager.list(STATE_DIR)
     else:
-        machines = [name]
-
-    with typer.progressbar(machines, label="Refreshing") as progress:
-        for machine in progress:
-            mm = MachineManager(
+        managers = [
+            MachineManager(
                 STATE_DIR,
-                machine,
+                name,
             )
-            mm.refresh()
+        ]
+
+    with typer.progressbar(managers, label="Refreshing") as progress:
+        for manager in progress:
+            manager.refresh()
 
 
 @app.command()
@@ -204,11 +226,10 @@ def ssh(
     print: bool = typer.Option(False),
 ):
     STATE_DIR = ctx.obj["state"]
-    mm = MachineManager(
+    machine = MachineManager(
         STATE_DIR,
         name,
-    )
-    machine = mm.get()
+    ).machine
     if not machine:
         typer.echo(f"Instance {name} does not exist")
         raise typer.Exit()
@@ -233,17 +254,13 @@ def start(
 ):
     STATE_DIR = ctx.obj["state"]
     if all:
-        machines = MachineManager.list(STATE_DIR)
+        managers = MachineManager.list(STATE_DIR)
     else:
-        machines = [name]
+        managers = [MachineManager(STATE_DIR, name)]
 
-    with typer.progressbar(machines, label="Starting") as progress:
-        for machine in progress:
-            mm = MachineManager(
-                STATE_DIR,
-                machine,
-            )
-            mm.start()
+    with typer.progressbar(managers, label="Starting") as progress:
+        for manager in progress:
+            manager.start()
 
 
 @app.command()
@@ -254,17 +271,13 @@ def stop(
 ):
     STATE_DIR = ctx.obj["state"]
     if all:
-        machines = MachineManager.list(STATE_DIR)
+        managers = MachineManager.list(STATE_DIR)
     else:
-        machines = [name]
+        managers = [MachineManager(STATE_DIR, name)]
 
-    with typer.progressbar(machines, label="Stopping") as progress:
-        for machine in progress:
-            mm = MachineManager(
-                STATE_DIR,
-                machine,
-            )
-            mm.stop()
+    with typer.progressbar(managers, label="Stopping") as progress:
+        for manager in progress:
+            manager.stop()
 
 
 @app.command()
@@ -275,11 +288,10 @@ def sync(
     CONFIG = Config(ctx.obj["config"])
     STATE_DIR = ctx.obj["state"]
     DEBUG = ctx.obj["debug"]
-    mm = MachineManager(
+    machine = MachineManager(
         STATE_DIR,
         name,
-    )
-    machine = mm.get()
+    ).machine
     if not machine:
         typer.echo(f"Instance {name} does not exist")
         raise typer.Exit()
@@ -318,11 +330,10 @@ def ssh_config(
     print: bool = typer.Option(False),
 ):
     STATE_DIR = ctx.obj["state"]
-    mm = MachineManager(
+    machine = MachineManager(
         STATE_DIR,
         name,
-    )
-    machine = mm.get()
+    ).machine
     if not machine:
         typer.echo(f"Instance {name} does not exist")
         raise typer.Exit()

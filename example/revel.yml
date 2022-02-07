@@ -1,0 +1,32 @@
+default:
+  name: "default"
+  description: "Ubuntu+Nix remote development machine"
+  ami: ami-05e155ca52886ffe4
+  user: ubuntu
+  public: true
+  size: "t3.micro"
+  disk:
+    size: 10
+    type: "IO1"
+  backups: true
+  init:
+    # - run: sh <(curl -L https://nixos.org/nix/install) --daemon
+    - run: /nix/var/nix/profiles/default/bin/nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
+    - run: /nix/var/nix/profiles/default/bin/nix-channel --update
+    - run: echo 'export NIX_PATH=$HOME/.nix-defexpr/channels:/nix/var/nix/profiles/per-user/root/channels${NIX_PATH:+:$NIX_PATH}' >> ~/.bashrc
+nixos:
+  name: "nixery"
+  description: "NixOS remote development machine"
+  ami: ami-05e155ca52886ffe4
+  user: ubuntu
+  public: true
+  size: "t3.micro"
+  disk:
+    size: 10
+    type: "IO1"
+  backups: true
+  init:
+    # - run: sh <(curl -L https://nixos.org/nix/install) --daemon
+    - run: /nix/var/nix/profiles/default/bin/nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
+    - run: /nix/var/nix/profiles/default/bin/nix-channel --update
+    - run: echo 'export NIX_PATH=$HOME/.nix-defexpr/channels:/nix/var/nix/profiles/per-user/root/channels${NIX_PATH:+:$NIX_PATH}' >> ~/.bashrc

@@ -15,6 +15,8 @@ typer = { extras = ["all"], version = "^0.4.0" }
 PyYAML = "^6.0"
 halo = "^0.0.31"
 sh = "^1.14.2"
+tabulate = "^0.8.9"
+colorama = "^0.4.4"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
@@ -29,6 +31,7 @@ types-PyYAML = "^6.0.3"
 types-boto3 = "^1.0.1"
 boto3-stubs = { extras = ["ec2"], version = "^1.20.31" }
 moto = { extras = ["ec2", "iam"], version = "^2.3.1" }
+types-tabulate = "^0.8.5"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

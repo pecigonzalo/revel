@@ -1,13 +1,14 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, cast
+from typing import Optional, Type, TypeVar, cast
 
 import boto3
 import yaml
 from botocore.exceptions import ClientError
-from mypy_boto3_ec2.literals import InstanceTypeType, ResourceTypeType
+from mypy_boto3_ec2.literals import InstanceTypeType, VolumeTypeType
 from mypy_boto3_ec2.service_resource import EC2ServiceResource, Instance
+from mypy_boto3_ec2.type_defs import BlockDeviceMappingTypeDef, EbsBlockDeviceTypeDef
 
 
 class MachineState(str, Enum):
@@ -16,6 +17,9 @@ class MachineState(str, Enum):
     SUSPENDED = "SUSPENDED"
     CREATING = "CREATING"
     TERMINATING = "TERMINATING"
+
+
+MachineT = TypeVar("MachineT", bound="Machine")
 
 
 @dataclass
@@ -28,9 +32,9 @@ class Machine:
     state: MachineState = MachineState.CREATING
     id: Optional[str] = None
 
-    @staticmethod
-    def parse(**kwargs) -> "Machine":
-        return Machine(
+    @classmethod
+    def from_object(cls: Type[MachineT], **kwargs) -> MachineT:
+        return cls(
             name=kwargs["name"],
             port=kwargs["port"],
             user=kwargs["user"],
@@ -81,9 +85,11 @@ class MachineManager:
         return Path(f"{self.machine_state_dir}/{self.machine.name}.yml")
 
     @staticmethod
-    def list(path: Path):
+    def list(machine_state_dir: Path) -> list["MachineManager"]:
         return [
-            file.with_suffix("").name for file in path.glob("*.yml") if file.is_file()
+            MachineManager(machine_state_dir, file.with_suffix("").name)
+            for file in machine_state_dir.glob("*.yml")
+            if file.is_file()
         ]
 
     def save(self) -> None:
@@ -121,7 +127,7 @@ class MachineManager:
         self.update(instance=instance)
         return self.machine
 
-    def load(self) -> Optional[Machine]:
+    def load(self) -> Machine:
         instance_state = self._get_machine_state_path()
         if not instance_state.exists():
             raise FileNotFoundError(f"Unable to find {instance_state}")
@@ -129,10 +135,10 @@ class MachineManager:
         with instance_state.open("r") as state_file:
             state = yaml.safe_load(state_file)
             if state:
-                self.machine = Machine.parse(**state)
+                self.machine = Machine.from_object(**state)
                 return self.machine
             else:
-                return None
+                raise ValueError(f"Unable to load YAML state {state_file.name}")
 
     def remove(self) -> None:
         instance_state = self._get_machine_state_path()
@@ -141,20 +147,23 @@ class MachineManager:
     # TODO: Get or raise, None is problematic here
     def get(self) -> Optional[Machine]:
         try:
-            if self.load():
-                return self.machine if self.machine.id else None
-            else:
-                return None
+            self.load()
+            return self.machine if self.machine.id else None
         except FileNotFoundError:
+            return None
+        except ValueError:
             return None
 
     def create(
         self,
         ami: str,
-        instance_type: str,
         key_name: str,
+        instance_type: str = "t3.micro",
         port: Optional[int] = None,
         user: Optional[str] = None,
+        volume_name: str = "/dev/sda1",
+        volume_size: int = 10,
+        volume_type: str = "gp3",
     ) -> Machine:
         if port:
             self.machine.port = port
@@ -163,6 +172,7 @@ class MachineManager:
 
         # Create a single instance
         self.save()
+        # TODO: Can we avoid casting?
         instances = self.ec2.create_instances(
             MaxCount=1,
             MinCount=1,
@@ -171,13 +181,23 @@ class MachineManager:
             KeyName=key_name,
             Monitoring={"Enabled": True},
             EbsOptimized=True,
+            BlockDeviceMappings=[
+                BlockDeviceMappingTypeDef(
+                    DeviceName=volume_name,
+                    Ebs=EbsBlockDeviceTypeDef(
+                        DeleteOnTermination=True,
+                        VolumeSize=volume_size,
+                        VolumeType=cast(VolumeTypeType, volume_type),
+                    ),
+                )
+            ],
             TagSpecifications=[
                 {
-                    "ResourceType": cast(ResourceTypeType, "instance"),
+                    "ResourceType": "instance",
                     "Tags": [{"Key": "Name", "Value": self.machine.name}],
                 },
                 {
-                    "ResourceType": cast(ResourceTypeType, "volume"),
+                    "ResourceType": "volume",
                     "Tags": [{"Key": "Name", "Value": self.machine.name}],
                 },
             ],

@@ -10,10 +10,10 @@ This project is in active development to reach v1.
 - [x] Destroy
 - [x] List
 - [x] Refresh
-- [ ] Provision
-- [ ] Sync
-- [ ] Stop
-- [ ] Start
+- [x] Provision
+- [x] Sync
+- [x] Stop
+- [x] Start
 - [ ] Releases automation
 - [ ] Integration tests
 - [ ] GCP Support
