@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Type, TypeVar, cast
+from typing import Any, Optional, cast
 
 import boto3
 import yaml
@@ -14,12 +14,29 @@ from mypy_boto3_ec2.type_defs import BlockDeviceMappingTypeDef, EbsBlockDeviceTy
 class MachineState(str, Enum):
     RUNNING = "RUNNING"
     STOPPED = "STOPPED"
+    STOPPING = "STOPPING"
     SUSPENDED = "SUSPENDED"
     CREATING = "CREATING"
     TERMINATING = "TERMINATING"
+    TERMINATED = "TERMINATED"
+    PENDING = "PENDING"
+    UNKNOWN = "UNKNOWN"
 
+    @classmethod
+    def from_instance_state(cls, state: Optional[str]) -> "MachineState":
+        instance_state_map = {
+            "pending": cls.PENDING,
+            "running": cls.RUNNING,
+            "shutting-down": cls.TERMINATING,
+            "terminated": cls.TERMINATED,
+            "stopping": cls.STOPPING,
+            "stopped": cls.STOPPED,
+        }
 
-MachineT = TypeVar("MachineT", bound="Machine")
+        if not state:
+            return cls.UNKNOWN
+
+        return instance_state_map.get(state, cls.UNKNOWN)
 
 
 @dataclass
@@ -33,7 +50,7 @@ class Machine:
     id: Optional[str] = None
 
     @classmethod
-    def from_object(cls: Type[MachineT], **kwargs) -> MachineT:
+    def from_object(cls, **kwargs) -> "Machine":
         return cls(
             name=kwargs["name"],
             port=kwargs["port"],
@@ -46,7 +63,7 @@ class Machine:
 
     def to_dict(
         self,
-    ) -> object:
+    ) -> dict[str, Any]:
         return {
             "name": self.name,
             "port": self.port,
@@ -112,6 +129,10 @@ class MachineManager:
 
         if state:
             self.machine.state = state
+        elif instance:
+            self.machine.state = MachineState.from_instance_state(
+                instance.state.get("Name")
+            )
 
         if persist:
             self.save()
@@ -124,6 +145,7 @@ class MachineManager:
             raise ValueError("Machine ID not found")
 
         instance = self.ec2.Instance(id)
+
         self.update(instance=instance)
         return self.machine
 
