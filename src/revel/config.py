@@ -8,14 +8,16 @@ import yaml
 
 
 class DiskType(Enum):
-    GP2 = "GP2"
-    IO1 = "IO1"
+    GP3 = "gp3"
+    GP2 = "gp2"
+    IO1 = "io1"
 
 
 @dataclass
 class Disk:
-    type: DiskType
-    size: int
+    type: DiskType = DiskType.GP3
+    size: int = 10
+    iops: int = 3000
 
 
 SyncFile = tuple[str, str]
@@ -34,6 +36,7 @@ Init = Union[SyncFiles, RunCommand]
 class Instance:
     ami: str
     user: str
+    key: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
     profile: Optional[str] = None
@@ -68,15 +71,18 @@ class Instance:
             sync_files = (file.split(":")[0], file.split(":")[1])
             sync.append(sync_files)
 
+        disk = kwargs.get("disk", None)
+
         return Instance(
             ami=kwargs.get("ami", None),
             user=kwargs.get("user", None),
             name=kwargs.get("name", None),
+            key=kwargs.get("key", None),
             description=kwargs.get("description", None),
             profile=kwargs.get("profile", None),
             public=kwargs.get("public", None),
             size=kwargs.get("size", None),
-            disk=kwargs.get("disk", None),
+            disk=Disk(**disk) if disk else None,
             backups=kwargs.get("backups", None),
             auto_shutdown=kwargs.get("auto_shutdown", None),
             init=init,

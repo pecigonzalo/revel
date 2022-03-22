@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from optparse import Option
 from pathlib import Path
 from typing import Any, Optional, cast
 
@@ -8,6 +9,8 @@ from botocore.exceptions import ClientError
 from mypy_boto3_ec2.literals import InstanceTypeType, VolumeTypeType
 from mypy_boto3_ec2.service_resource import EC2ServiceResource, Instance
 from mypy_boto3_ec2.type_defs import BlockDeviceMappingTypeDef, EbsBlockDeviceTypeDef
+
+from revel.config import Disk, DiskType
 
 
 class MachineState(str, Enum):
@@ -182,12 +185,10 @@ class MachineManager:
         self,
         ami: str,
         key_name: str,
-        instance_type: str = "t3.micro",
+        size: str = "t3.micro",
+        disk: Disk = Disk(),
         port: Optional[int] = None,
         user: Optional[str] = None,
-        volume_name: str = "/dev/sda1",
-        volume_size: int = 10,
-        volume_type: str = "gp3",
     ) -> Machine:
         if port:
             self.machine.port = port
@@ -196,22 +197,24 @@ class MachineManager:
 
         # Create a single instance
         self.save()
+
         # TODO: Can we avoid casting?
         instances = self.ec2.create_instances(
             MaxCount=1,
             MinCount=1,
             ImageId=ami,
-            InstanceType=cast(InstanceTypeType, instance_type),
+            InstanceType=cast(InstanceTypeType, size),
             KeyName=key_name,
             Monitoring={"Enabled": True},
             EbsOptimized=True,
             BlockDeviceMappings=[
                 BlockDeviceMappingTypeDef(
-                    DeviceName=volume_name,
+                    DeviceName="/dev/sda1", # TODO: This should be a parameter
                     Ebs=EbsBlockDeviceTypeDef(
                         DeleteOnTermination=True,
-                        VolumeSize=volume_size,
-                        VolumeType=cast(VolumeTypeType, volume_type),
+                        VolumeSize=disk.size,
+                        VolumeType=cast(VolumeTypeType, disk.type),
+                        Iops=disk.iops,
                     ),
                 )
             ],

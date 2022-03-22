@@ -37,6 +37,9 @@ class SSH:
         rsync = sh.Command("rsync")
         full_src = Path(src).expanduser()
         command = rsync.bake(
+            "-r",
+            "-z",
+            "-L",  # TODO: Support these attributes in the sync definition
             full_src,
             f"{self.user}@{self.host}:{dst}",
             _fg=True,

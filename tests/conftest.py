@@ -5,7 +5,7 @@ import pytest
 import revel
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="function")
 def mock_aws_credentials(monkeypatch):
     """Mocked AWS Credentials for moto."""
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
