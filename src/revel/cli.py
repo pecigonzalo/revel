@@ -13,7 +13,7 @@ from tabulate import tabulate
 from revel import Config
 from revel import __name__ as cli_name
 from revel import __version__ as cli_version
-from revel.config import DiskType, RunCommand, SyncFiles
+from revel.config import Disk, DiskType, RunCommand, SyncFiles
 from revel.machine import MachineManager
 from revel.providers.ssh import SSH
 from revel.state import state
@@ -131,19 +131,27 @@ def create(
             spinner="bouncingBar",
             color="green",
         ):
-            if instance_config.disk:
-                machine = mm.create(
-                    ami=instance_config.ami,
-                    size=instance_config.size,
-                    disk=instance_config.disk,
-                    key_name=instance_config.key or "",
-                )
+            if (disk := instance_config.disk):
+                volume_size = disk.size
+                volume_type = disk.type
+                volume_iops = disk.iops
             else:
-                machine = mm.create(
-                    ami=instance_config.ami,
-                    size=instance_config.size,
-                    key_name=instance_config.key or "",
-                )
+                disk = Disk()
+                volume_size = disk.size
+                volume_type = disk.type
+                volume_iops = disk.iops
+
+
+            machine = mm.create(
+                ami=instance_config.ami,
+                instance_size=instance_config.size,
+                volume_type=volume_type,
+                volume_size=volume_size,
+                volume_iops=volume_iops,
+                key_name=instance_config.key or "",
+                user=instance_config.user,
+                port=instance_config.port,
+            )
 
         typer.echo(f"Instance id: {machine.id}")
         typer.echo("Connection information:")

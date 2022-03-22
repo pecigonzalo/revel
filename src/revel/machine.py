@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import Enum
-from optparse import Option
 from pathlib import Path
 from typing import Any, Optional, cast
 
@@ -9,8 +8,6 @@ from botocore.exceptions import ClientError
 from mypy_boto3_ec2.literals import InstanceTypeType, VolumeTypeType
 from mypy_boto3_ec2.service_resource import EC2ServiceResource, Instance
 from mypy_boto3_ec2.type_defs import BlockDeviceMappingTypeDef, EbsBlockDeviceTypeDef
-
-from revel.config import Disk, DiskType
 
 
 class MachineState(str, Enum):
@@ -43,9 +40,9 @@ class MachineState(str, Enum):
 
 @dataclass
 class Machine:
-    name: str = "default"
-    port: int = 22
-    user: str = "ec2-user"
+    name: Optional[str] = None
+    port: Optional[int] = None
+    user: Optional[str] = None
     public_ip_address: Optional[str] = None
     private_ip_address: Optional[str] = None
     state: MachineState = MachineState.CREATING
@@ -185,15 +182,15 @@ class MachineManager:
         self,
         ami: str,
         key_name: str,
-        size: str = "t3.micro",
-        disk: Disk = Disk(),
-        port: Optional[int] = None,
-        user: Optional[str] = None,
+        port: int,
+        user: str,
+        instance_size: str,
+        volume_size: int,
+        volume_type: str,
+        volume_iops: int,
     ) -> Machine:
-        if port:
-            self.machine.port = port
-        if user:
-            self.machine.user = user
+        self.machine.port = port
+        self.machine.user = user
 
         # Create a single instance
         self.save()
@@ -203,7 +200,7 @@ class MachineManager:
             MaxCount=1,
             MinCount=1,
             ImageId=ami,
-            InstanceType=cast(InstanceTypeType, size),
+            InstanceType=cast(InstanceTypeType, instance_size),
             KeyName=key_name,
             Monitoring={"Enabled": True},
             EbsOptimized=True,
@@ -212,9 +209,9 @@ class MachineManager:
                     DeviceName="/dev/sda1", # TODO: This should be a parameter
                     Ebs=EbsBlockDeviceTypeDef(
                         DeleteOnTermination=True,
-                        VolumeSize=disk.size,
-                        VolumeType=cast(VolumeTypeType, disk.type),
-                        Iops=disk.iops,
+                        VolumeSize=volume_size,
+                        VolumeType=cast(VolumeTypeType, volume_type),
+                        Iops=volume_iops,
                     ),
                 )
             ],

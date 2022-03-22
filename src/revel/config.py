@@ -7,7 +7,7 @@ from typing import Optional, Union
 import yaml
 
 
-class DiskType(Enum):
+class DiskType(str, Enum):
     GP3 = "gp3"
     GP2 = "gp2"
     IO1 = "io1"
@@ -35,12 +35,13 @@ Init = Union[SyncFiles, RunCommand]
 @dataclass
 class Instance:
     ami: str
-    user: str
+    user: str = "ec2-user"
     key: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
     profile: Optional[str] = None
     public: bool = True  # TODO: Review if we can make it with SSM
+    port: int = 22
     size: str = "t3.micro"
     disk: Optional[Disk] = None
     backups: bool = False
