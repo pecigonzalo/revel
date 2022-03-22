@@ -1,7 +1,5 @@
-from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Optional, cast
 
 import yaml
 from botocore.exceptions import ClientError
@@ -9,150 +7,40 @@ from mypy_boto3_ec2.literals import InstanceTypeType, VolumeTypeType
 from mypy_boto3_ec2.service_resource import EC2ServiceResource, Instance
 from mypy_boto3_ec2.type_defs import BlockDeviceMappingTypeDef, EbsBlockDeviceTypeDef
 
-
-class MachineState(str, Enum):
-    RUNNING = "RUNNING"
-    STOPPED = "STOPPED"
-    STOPPING = "STOPPING"
-    SUSPENDED = "SUSPENDED"
-    CREATING = "CREATING"
-    TERMINATING = "TERMINATING"
-    TERMINATED = "TERMINATED"
-    PENDING = "PENDING"
-    UNKNOWN = "UNKNOWN"
-
-    @classmethod
-    def from_instance_state(cls, state: Optional[str]) -> "MachineState":
-        instance_state_map = {
-            "pending": cls.PENDING,
-            "running": cls.RUNNING,
-            "shutting-down": cls.TERMINATING,
-            "terminated": cls.TERMINATED,
-            "stopping": cls.STOPPING,
-            "stopped": cls.STOPPED,
-        }
-
-        if not state:
-            return cls.UNKNOWN
-
-        return instance_state_map.get(state, cls.UNKNOWN)
-
-
-@dataclass
-class Machine:
-    name: Optional[str] = None
-    port: Optional[int] = None
-    user: Optional[str] = None
-    public_ip_address: Optional[str] = None
-    private_ip_address: Optional[str] = None
-    state: MachineState = MachineState.CREATING
-    id: Optional[str] = None
-
-    @classmethod
-    def from_object(cls, **kwargs) -> "Machine":
-        return cls(
-            name=kwargs["name"],
-            port=kwargs["port"],
-            user=kwargs["user"],
-            public_ip_address=kwargs["public_ip_address"],
-            private_ip_address=kwargs["private_ip_address"],
-            state=MachineState(kwargs["state"]),
-            id=kwargs["id"],
-        )
-
-    def to_dict(
-        self,
-    ) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            "port": self.port,
-            "user": self.user,
-            "public_ip_address": self.public_ip_address,
-            "private_ip_address": self.private_ip_address,
-            "state": self.state.value,
-            "id": self.id,
-        }
+from .machine import Machine
+from .state import State
 
 
 class MachineManager:
-    machine_state_dir: Path
+    state_dir: Path
     machine: Machine
     ec2: EC2ServiceResource
 
     def __init__(
         self,
-        machine_state_dir: Path,
-        name: str,
+        machine: Machine,
+        state_dir: Path,
         ec2: EC2ServiceResource,
     ) -> None:
         self.ec2 = ec2
-        self.machine_state_dir = machine_state_dir
-        self.machine = Machine(name=name)
+        self.state_dir = state_dir
+        self.machine = machine
 
         # Lazy load config
         try:
-            self.load()
+            self.load_from_state()
         except Exception:
             pass
 
-    def _get_machine_state_path(self) -> Path:
-        self.machine_state_dir.mkdir(parents=True, exist_ok=True)
 
-        return Path(f"{self.machine_state_dir}/{self.machine.name}.yml")
+    def _machine_state_path(self) -> Path:
+        # NOTE: Should this be here? Maybe not
+        self.state_dir.mkdir(parents=True, exist_ok=True)
 
-    @staticmethod
-    def list(
-        machine_state_dir: Path,
-        ec2: EC2ServiceResource,
-    ) -> list["MachineManager"]:
-        return [
-            MachineManager(machine_state_dir, file.with_suffix("").name, ec2)
-            for file in machine_state_dir.glob("*.yml")
-            if file.is_file()
-        ]
+        return Path(f"{self.state_dir}/{self.machine.name}.yml")
 
-    def save(self) -> None:
-        instance_state = self._get_machine_state_path()
-        with instance_state.open("w") as state_file:
-            yaml.safe_dump(
-                self.machine.to_dict(), state_file, tags=None, default_flow_style=False
-            )
-
-    def update(
-        self,
-        instance: Optional[Instance] = None,
-        state: Optional[MachineState] = None,
-        persist: bool = True,
-    ) -> None:
-        if instance:
-            self.machine.id = instance.id
-            self.machine.public_ip_address = instance.public_ip_address
-            self.machine.private_ip_address = instance.private_ip_address
-
-        if state:
-            self.machine.state = state
-        elif instance:
-            self.machine.state = MachineState.from_instance_state(
-                instance.state.get("Name")
-            )
-
-        if persist:
-            self.save()
-
-    def refresh(self) -> Machine:
-        self.load()
-        if self.machine.id:
-            id = self.machine.id
-        else:
-            raise ValueError("Machine ID not found")
-
-        instance = self.ec2.Instance(id)
-
-        self.update(instance=instance)
-        return self.machine
-
-    def load(self) -> Machine:
-        instance_state = self._get_machine_state_path()
+    def load_from_state(self) -> Machine:
+        instance_state = self._machine_state_path()
         if not instance_state.exists():
             raise FileNotFoundError(f"Unable to find {instance_state}")
 
@@ -164,14 +52,65 @@ class MachineManager:
             else:
                 raise ValueError(f"Unable to load YAML state {state_file.name}")
 
+    @staticmethod
+    def list(
+        machine_state_dir: Path,
+        ec2: EC2ServiceResource,
+    ) -> list["MachineManager"]:
+        return [
+            MachineManager(Machine(file.with_suffix("").name), machine_state_dir, ec2)
+            for file in machine_state_dir.glob("*.yml")
+            if file.is_file()
+        ]
+
+    def save(self) -> None:
+        instance_state = self._machine_state_path()
+        with instance_state.open("w") as state_file:
+            yaml.safe_dump(
+                self.machine.to_dict(), state_file, tags=None, default_flow_style=False
+            )
+
+    def update(
+        self,
+        instance: Optional[Instance] = None,
+        state: Optional[State] = None,
+        persist: bool = True,
+    ) -> None:
+        if instance:
+            self.machine.id = instance.id
+            self.machine.public_ip_address = instance.public_ip_address
+            self.machine.private_ip_address = instance.private_ip_address
+
+        if state:
+            self.machine.state = state
+        elif instance:
+            self.machine.state = State.from_instance_state(
+                instance.state.get("Name")
+            )
+
+        if persist:
+            self.save()
+
+    def refresh(self) -> Machine:
+        self.load_from_state()
+        if self.machine.id:
+            id = self.machine.id
+        else:
+            raise ValueError("Machine ID not found")
+
+        instance = self.ec2.Instance(id)
+
+        self.update(instance=instance)
+        return self.machine
+
     def remove(self) -> None:
-        instance_state = self._get_machine_state_path()
+        instance_state = self._machine_state_path()
         instance_state.unlink()
 
     # TODO: Get or raise, None is problematic here
     def get(self) -> Optional[Machine]:
         try:
-            self.load()
+            self.load_from_state()
             return self.machine if self.machine.id else None
         except FileNotFoundError:
             return None
@@ -227,7 +166,7 @@ class MachineManager:
             ],
         )
         instance: Instance = instances[0]
-        self.update(instance, state=MachineState.CREATING)
+        self.update(instance, state=State.CREATING)
 
         instance.wait_until_running()
         return self.refresh()
@@ -247,7 +186,7 @@ class MachineManager:
             else:
                 raise e
 
-        self.update(instance, state=MachineState.TERMINATING)
+        self.update(instance, state=State.TERMINATING)
         instance.wait_until_terminated()
         self.remove()
 
@@ -260,7 +199,7 @@ class MachineManager:
         instance.stop()
         instance.wait_until_stopped()
         self.refresh()
-        self.update(state=MachineState.STOPPED)
+        self.update(state=State.STOPPED)
 
     def start(self) -> None:
         if not self.machine.id:
@@ -271,7 +210,7 @@ class MachineManager:
         instance.start()
         instance.wait_until_running()
         self.refresh()
-        self.update(state=MachineState.RUNNING)
+        self.update(state=State.RUNNING)
 
     def suspend(self) -> None:
         raise NotImplementedError("Not implemented")

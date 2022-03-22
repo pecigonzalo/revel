@@ -10,13 +10,12 @@ from halo import Halo
 from sh import ErrorReturnCode  # TODO: This is a bit too leaky
 from tabulate import tabulate
 
-from revel import Config
-from revel import __name__ as cli_name
-from revel import __version__ as cli_version
-from revel.config import Disk, DiskType, RunCommand, SyncFiles
-from revel.machine import MachineManager
-from revel.providers.ssh import SSH
-from revel.state import state
+from . import __name__ as cli_name
+from . import __version__ as cli_version
+from .config import Config, DiskConfig, RunCommand, SyncFiles
+from .machine import Machine, MachineManager
+from .providers.ssh import SSH
+from .state import state
 
 app = typer.Typer()
 
@@ -48,8 +47,8 @@ def provision(
     SESSION = get_ec2_resource()
 
     machine = MachineManager(
+        Machine(name),
         STATE_DIR,
-        name,
         SESSION,
     ).machine
     if not machine:
@@ -63,6 +62,10 @@ def provision(
     instance_config = CONFIG.instances.get(name)
     if not instance_config:
         typer.echo("Failed to find instance config")
+        raise typer.Exit()
+
+    if not machine.user:
+        typer.echo("Machine has no user defined")
         raise typer.Exit()
 
     client = SSH(user=machine.user, host=machine.public_ip_address)
@@ -113,8 +116,8 @@ def create(
         raise typer.Abort()
 
     mm = MachineManager(
+        Machine(name),
         STATE_DIR,
-        name,
         SESSION,
     )
     machine = mm.machine
@@ -136,7 +139,7 @@ def create(
                 volume_type = disk.type
                 volume_iops = disk.iops
             else:
-                disk = Disk()
+                disk = DiskConfig()
                 volume_size = disk.size
                 volume_type = disk.type
                 volume_iops = disk.iops
@@ -177,8 +180,8 @@ def destroy(
         )
         managers = [
             MachineManager(
+                Machine(name),
                 STATE_DIR,
-                name,
                 SESSION,
             )
         ]
@@ -249,8 +252,8 @@ def refresh(
     else:
         managers = [
             MachineManager(
+                Machine(name),
                 STATE_DIR,
-                name,
                 SESSION,
             )
         ]
@@ -269,8 +272,8 @@ def ssh(
     STATE_DIR = ctx.obj["state"]
     SESSION = get_ec2_resource()
     machine = MachineManager(
+        Machine(name),
         STATE_DIR,
-        name,
         SESSION,
     ).machine
     if not machine:
@@ -279,6 +282,10 @@ def ssh(
 
     if not machine.public_ip_address:
         typer.echo(f"Instance {name} has no public IP")
+        raise typer.Exit()
+
+    if not machine.user:
+        typer.echo("Machine has no user defined")
         raise typer.Exit()
 
     client = SSH(machine.user, machine.public_ip_address)
@@ -300,7 +307,7 @@ def start(
     if all:
         managers = MachineManager.list(STATE_DIR, SESSION)
     else:
-        managers = [MachineManager(STATE_DIR, name, SESSION)]
+        managers = [MachineManager(Machine(name), STATE_DIR, SESSION,)]
 
     with typer.progressbar(managers, label="Starting") as progress:
         for manager in progress:
@@ -318,7 +325,7 @@ def stop(
     if all:
         managers = MachineManager.list(STATE_DIR, SESSION)
     else:
-        managers = [MachineManager(STATE_DIR, name, SESSION)]
+        managers = [MachineManager(Machine(name), STATE_DIR, SESSION)]
 
     with typer.progressbar(managers, label="Stopping") as progress:
         for manager in progress:
@@ -335,8 +342,8 @@ def sync(
     DEBUG = ctx.obj["debug"]
     SESSION = get_ec2_resource()
     machine = MachineManager(
+        Machine(name),
         STATE_DIR,
-        name,
         SESSION,
     ).machine
     if not machine:
@@ -350,6 +357,10 @@ def sync(
     instance_config = CONFIG.instances.get(name)
     if not instance_config:
         typer.echo("Failed to find instance config")
+        raise typer.Exit()
+
+    if not machine.user:
+        typer.echo("Machine has no user defined")
         raise typer.Exit()
 
     client = SSH(machine.user, machine.public_ip_address)
@@ -378,7 +389,7 @@ def ssh_config(
 ):
     STATE_DIR = ctx.obj["state"]
     SESSION = get_ec2_resource()
-    machine = MachineManager(STATE_DIR, name, SESSION).machine
+    machine = MachineManager(Machine(name), STATE_DIR, SESSION).machine
     if not machine:
         typer.echo(f"Instance {name} does not exist")
         raise typer.Exit()

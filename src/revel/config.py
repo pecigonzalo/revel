@@ -7,15 +7,15 @@ from typing import Optional, Union
 import yaml
 
 
-class DiskType(str, Enum):
+class DiskConfigType(str, Enum):
     GP3 = "gp3"
     GP2 = "gp2"
     IO1 = "io1"
 
 
 @dataclass
-class Disk:
-    type: DiskType = DiskType.GP3
+class DiskConfig:
+    type: DiskConfigType = DiskConfigType.GP3
     size: int = 10
     iops: int = 3000
 
@@ -33,7 +33,7 @@ Init = Union[SyncFiles, RunCommand]
 
 
 @dataclass
-class Instance:
+class InstanceConfig:
     ami: str
     user: str = "ec2-user"
     key: Optional[str] = None
@@ -43,14 +43,14 @@ class Instance:
     public: bool = True  # TODO: Review if we can make it with SSM
     port: int = 22
     size: str = "t3.micro"
-    disk: Optional[Disk] = None
+    disk: Optional[DiskConfig] = None
     backups: bool = False
     auto_shutdown: bool = True
     init: list[Init] = field(default_factory=list[Init])
     sync: list[SyncFile] = field(default_factory=list[SyncFile])
 
     @staticmethod
-    def parse(**kwargs) -> "Instance":
+    def parse(**kwargs) -> "InstanceConfig":
         init: list[Init] = []
         for i in kwargs.get("init", []):
             if i.get("files", None):
@@ -74,7 +74,7 @@ class Instance:
 
         disk = kwargs.get("disk", None)
 
-        return Instance(
+        return InstanceConfig(
             ami=kwargs.get("ami", None),
             user=kwargs.get("user", None),
             name=kwargs.get("name", None),
@@ -83,7 +83,7 @@ class Instance:
             profile=kwargs.get("profile", None),
             public=kwargs.get("public", None),
             size=kwargs.get("size", None),
-            disk=Disk(**disk) if disk else None,
+            disk=DiskConfig(**disk) if disk else None,
             backups=kwargs.get("backups", None),
             auto_shutdown=kwargs.get("auto_shutdown", None),
             init=init,
@@ -91,16 +91,16 @@ class Instance:
         )
 
 
-Instances = dict[str, Instance]
+InstanceConfigs = dict[str, InstanceConfig]
 
 
 class Config:
-    instances: Instances
+    instances: InstanceConfigs
 
     def load(self, path: Path) -> None:
         with open(path, "r") as config:
             yaml_config = yaml.safe_load(config)
-            self.instances = {k: Instance.parse(**v) for k, v in yaml_config.items()}
+            self.instances = {k: InstanceConfig.parse(**v) for k, v in yaml_config.items()}
 
     def __init__(self, path: Path):
         self.load(path)
