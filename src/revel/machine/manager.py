@@ -149,7 +149,7 @@ class MachineManager:
                     Ebs=EbsBlockDeviceTypeDef(
                         DeleteOnTermination=True,
                         VolumeSize=volume_size,
-                        VolumeType=cast(VolumeTypeType, volume_type),
+                        VolumeType=cast(VolumeTypeType, volume_type.lower()),
                         Iops=volume_iops,
                     ),
                 )

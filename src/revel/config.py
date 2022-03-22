@@ -8,9 +8,9 @@ import yaml
 
 
 class DiskConfigType(str, Enum):
-    GP3 = "gp3"
-    GP2 = "gp2"
-    IO1 = "io1"
+    GP3 = "GP3"
+    GP2 = "GP2"
+    IO1 = "IO1"
 
 
 @dataclass

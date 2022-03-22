@@ -14,7 +14,7 @@ class State(str, Enum):
     UNKNOWN = "UNKNOWN"
 
     @classmethod
-    def from_instance_state(cls, state: Optional[str]) -> "MachineState":
+    def from_instance_state(cls, state: Optional[str]) -> "State":
         instance_state_map = {
             "pending": cls.PENDING,
             "running": cls.RUNNING,

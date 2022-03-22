@@ -12,5 +12,5 @@ def test_full_config_load():
 
     for k, v in result.instances.items():
         assert isinstance(
-            v, config.Instance
+            v, config.InstanceConfig
         ), f"Instances {k} should be of type Instance"
