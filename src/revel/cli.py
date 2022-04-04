@@ -187,7 +187,7 @@ def destroy(
         ]
 
     for mm in managers:
-        typer.echo(f"Deleting instance {mm.machine.name}...")
+        typer.echo(f"Deleting instance {mm.machine.name} with id {mm.machine.id}...")
         with Halo(
             text="Waiting for instance to be destroyed...",
             spinner="bouncingBar",
